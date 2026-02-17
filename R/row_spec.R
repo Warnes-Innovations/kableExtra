@@ -194,6 +194,7 @@ row_spec_html <- function(kable_input, row, bold, italic, monospace,
         )
       }
     }
+    }
   }
 
   out <- as_kable_xml(body_node)
