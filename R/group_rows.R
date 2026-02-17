@@ -47,6 +47,17 @@
 #' @param background A character string for column background color. Here please
 #' pay attention to the differences in color codes between HTML and LaTeX.
 #'
+#' @details
+#' In HTML output, it is an error to insert a break
+#' between groups that would fall within collapsed rows
+#' produced by [collapse_rows()].  To work around
+#' this, modify the column entries that follow the break
+#' to be different from those before the break, e.g.
+#' by adding a zero-width space (Unicode `"\u200B"`)
+#' to those in the later group, so that [collapse_rows()]
+#' will think the entries are different and will not
+#' collapse them together.
+#'
 #' @examples
 #' \dontrun{
 #' x <- knitr::kable(head(mtcars), "html")
@@ -133,7 +144,7 @@ group_row_index_translator <- function(index) {
   index <- standardize_header_input(index)
   index$start <- cumsum(c(1, index$colspan))[1:length(index$colspan)]
   index$end <- cumsum(index$colspan)
-  index$header <- trimws(index$header)
+  index$header <- trimws(regex_unescape(index$header))
   index <- index[index$header != "", ]
   return(index)
 }
@@ -143,9 +154,18 @@ group_rows_html <- function(kable_input, group_label, start_row, end_row,
                             bold, italic, monospace, underline, strikeout,
                             color, background) {
   kable_attrs <- attributes(kable_input)
-  kable_xml <- read_kable_as_xml(kable_input)
-  kable_tbody <- xml_tpart(kable_xml, "tbody")
 
+  collapse_matrix <- kable_attrs$collapse_matrix
+  if (!is.null(collapse_matrix) &&
+      any(collapse_matrix[start_row,] == 0))
+    stop("Grouping occurs within collapsed rows at row ", start_row)
+
+  important_nodes <- read_kable_as_xml(kable_input)
+  body_node <- important_nodes$body
+  kable_xml <- important_nodes$table
+  kable_tbody <- xml_tpart(kable_xml, "tbody")
+  if (is.null(kable_tbody))
+    return(kable_input)
   if (escape) {
     group_label <- escape_html(group_label)
   }
@@ -214,7 +234,7 @@ group_rows_html <- function(kable_input, group_label, start_row, end_row,
   xml_add_sibling(starting_node, group_header_row, .where = "before")
 
   # add indentations to items
-  out <- as_kable_xml(kable_xml)
+  out <- as_kable_xml(body_node)
   attributes(out) <- kable_attrs
   attr(out, "group_header_rows") <- c(attr(out, "group_header_rows"), group_seq[1])
   if (indent) {
@@ -229,6 +249,7 @@ group_rows_latex <- function(kable_input, group_label, start_row, end_row,
                              extra_latex_after = NULL, indent, latex_wrap_text = F,
                              monospace = F, underline = F, strikeout = F,
                              color = NULL, background = NULL) {
+  kable_attrs <- attributes(kable_input)
   table_info <- magic_mirror(kable_input)
   out <- solve_enc(kable_input)
 
@@ -241,7 +262,7 @@ group_rows_latex <- function(kable_input, group_label, start_row, end_row,
   if (escape) {
     group_label <- input_escape(group_label, latex_align)
   } else {
-    group_label <- sim_double_escape(group_label)
+    group_label <- sim_all_double_escape(group_label)
   }
 
   if (bold) {
@@ -311,9 +332,11 @@ group_rows_latex <- function(kable_input, group_label, start_row, end_row,
   }
 
   out <- gsub("\\\\addlinespace\n", "", out)
-  out <- structure(out, format = "latex", class = "knitr_kable")
+
   table_info$group_rows_used <- TRUE
-  attr(out, "kable_meta") <- table_info
+
+  out <- finalize_latex(out, kable_attrs, table_info)
+
   if (indent) {
     out <- add_indent_latex(out, seq(start_row, end_row))
   }

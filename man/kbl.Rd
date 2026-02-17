@@ -65,11 +65,12 @@ are left-aligned. If \code{length(align) == 1L}, the string will be
 expanded to a vector of individual letters, e.g. \code{'clc'} becomes
 \code{c('c', 'l', 'c')}, unless the output format is LaTeX.}
 
-\item{caption}{The table caption.}
+\item{caption}{The table caption. By default, it is retrieved from the chunk
+option \code{tab.cap}.}
 
 \item{label}{The table reference label. By default, the label is obtained
-from \code{knitr::\link[knitr]{opts_current}$get('label')}. To disable the label,
-use \code{label = NA}.}
+from \code{knitr::\link[knitr]{opts_current}$get('label')} (i.e., the current
+chunk label). To disable the label, use \code{label = NA}.}
 
 \item{format.args}{A list of arguments to be passed to \code{\link{format}()}
 to format table values, e.g. \code{list(big.mark = ',')}.}
@@ -139,6 +140,11 @@ However, it has many latex/html specific arguments hidden under the ground
 unless you check its source code. This wrapper function is created to
 provide better documentation (and auto-complete yay) and at the same time,
 solve the auto format setting in a better way.
+
+As of \code{kableExtra} version 1.4.0.19, this function also
+records the value of the \code{booktabs} argument in its output
+so that it doesn't have to be guessed from the text of the
+result when needed later in other functions.
 }
 \note{
 The current set of arguments were written for

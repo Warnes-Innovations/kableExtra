@@ -222,6 +222,11 @@ remove_html_doc <- function(x){
   writeLines(out, x)
 }
 
+extract_tabular <- function(x, info) {
+  x <- sub(paste0(".*(", info$begin_tabular, ")"), "\\1", x)
+  sub(paste0("(", info$end_tabular, ").*"), "\\1", x)
+}
+
 save_kable_latex <- function(x, file, latex_header_includes, keep_tex, density) {
 
   # if file extension is .tex, write to file, return the table as an
@@ -230,16 +235,18 @@ save_kable_latex <- function(x, file, latex_header_includes, keep_tex, density) 
     writeLines(x, file, useBytes = T)
     return(invisible(x))
   }
+  # The standalone class doesn't work well with
+  # floats, so extract just the tabular part
+  # of the table
+  info <- magic_mirror_latex(x)
+  options <- "border=1mm"
+  if (info$table_env)
+    options <- paste(options, "varwidth", sep = ",")
 
   temp_tex <- c(
-    "\\documentclass[border=1mm, preview]{standalone}",
-    "\\usepackage[active,tightpage]{preview}",
-    "\\usepackage{varwidth}",
+    paste0("\\documentclass[", options, "]{standalone}"),
     "\\usepackage{amssymb, amsmath}",
-    "\\usepackage{ifxetex,ifluatex}",
-    "\\usepackage{fixltx2e}",
-    "\\usepackage{polyglossia}",
-    latex_pkg_list(),
+    latex_pkg_list(xelatex = TRUE),
     "\\usepackage{graphicx}",
     "\\usepackage{xunicode}",
     "\\usepackage{xcolor}",
@@ -256,12 +263,20 @@ save_kable_latex <- function(x, file, latex_header_includes, keep_tex, density) 
   file_no_ext <- tools::file_path_sans_ext(temp_tex_file)
 
   owd <- setwd(dirname(temp_tex_file))
+  on.exit(setwd(owd), add = TRUE)
 
-  system(paste0('xelatex -interaction=batchmode "',
-                temp_tex_file, '"'))
   if (!keep_tex) {
     temp_file_delete <- paste0(file_no_ext, c(".tex", ".aux", ".log"))
-    unlink(temp_file_delete)
+    on.exit(unlink(temp_file_delete), add = TRUE)
+  }
+
+  if (!requireNamespace("tinytex", quietly = TRUE)) {
+    system(paste0("xelatex -interaction=batchmode ",
+                  gsub(pattern = " ", replacement = "\\ ",
+                       temp_tex_file, fixed = TRUE)))
+  } else {
+    tinytex::xelatex(gsub(pattern = " ", replacement = "\\ ",
+                          temp_tex_file, fixed = TRUE))
   }
 
   table_img_info <- NULL
@@ -283,8 +298,6 @@ save_kable_latex <- function(x, file, latex_header_includes, keep_tex, density) 
                         paste0(file_no_ext, ".", tools::file_ext(file)),
                         density = density)
   }
-
-  setwd(owd)
 
   out <- paste0(file_no_ext, ".", tools::file_ext(file))
   attr(out, "info") <- table_img_info

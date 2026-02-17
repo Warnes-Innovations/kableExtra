@@ -1,3 +1,60 @@
+kableExtra 1.4.0.19
+--------------------------------------------------------------------------------
+
+Bug Fixes:
+
+* Fixed a bug in `html_color()` to account for CSS's expectation that
+alpha be between 0 and 1, different from R's 0 and 255 (#902).
+* Using `pack_rows()` or `group_rows()` to insert a separator
+that falls within a collapsed label did not render properly in HTML.
+It is now an error to do that; see `?pack_rows` for a workaround (#840).
+* `save_kable()` could fail when a LaTeX table was wrapped in 
+a floating environment.  Now the `varwidth` option is used
+to allow it (#897, #908).
+* `save_kable()` on a LaTeX table processed with `xelatex`
+generated a warning that `inputenc` shouldn't be used.  The
+`kableExtra_latex_packages()` function has gained an extra 
+argument to support this.
+* `column_spec()` sometimes created incorrect LaTeX when
+the table contained `"."` characters (#900).
+* `column_spec()` failed to set column width
+in `booktabs` tables with customized rules (#891).
+
+
+kableExtra 1.4.0.13
+--------------------------------------------------------------------------------
+
+New Features:
+
+* Added `show_every_page` argument to `footnote()` (#867).
+* Added `class` argument to `cell_spec()` (#871).
+* `add_header_above()` now supports specifying
+`line` as a vector (#700).
+* `add_header_above()` and `linebreak()` now accept more exotic 
+`align` specifications, e.g. `p{2cm}`.
+
+Bug Fixes:
+
+* Fixed a bug in `collapse_rows()`, which failed on tables
+that had no header (#812).
+* Fixed a bug in `row_spec()` which added extra 
+line breaks when `extra_latex_after` was specified (#815).
+* Fixed a bug in `kable_styling()` which didn't parse 
+"pipe" tables containing multibyte characters properly (#821).
+* Fixed a bug in `add_header_above()` which caused headers
+containing LaTeX code to be rendered incorrectly in LaTeX 
+documents (#836).
+* Fixed a bug in `save_kable_latex()` which left the user
+in the wrong directory if an error occurred (#865).
+* Fixed a bug in `magic_mirror_latex()` which
+stopped it from working with `tabularx` tables (#861).
+* Complex alignment options like `p{1cm}` were not
+handled properly by `kable_styling()` (#876).
+* Fixed a bug in `group_rows()`/`pack_rows()` which caused
+LaTeX code to be mangled (#887).
+* `scroll_box()` no longer ignores `box_css` (#892).
+
+
 kableExtra 1.4.0
 --------------------------------------------------------------------------------
 
@@ -49,7 +106,7 @@ widths (#806).
 Documentation and Maintenance:
 
 * Documented special cases and added heads-up about typo in `linebreak.R` (#679).
-* Added Github action to run R CMD check, necessitating `pdflatex` and vignette
+* Added GitHub action to run R CMD check, necessitating `pdflatex` and vignette
 compaction (#780).
 * Defaulted to `booktabs=TRUE`, `longtable=TRUE` when converting a pipe table (#778).
 * Declared LaTeX packages with each `kbl()` call and exported
@@ -82,7 +139,7 @@ in the form of "var", "a_mean", "a_sd", "b_mean" and "b_sd", this
 "mean", "sd", "mean" and "sd" and add an additional row with group a and b 
 there.
 
-* @r2evans significanntly improved the previous spec_** functions to generate 
+* @r2evans significantly improved the previous spec_** functions to generate
 mini plots. He also added a more general `spec_plot` function to use the base R general plot function (scatter, line / polygon).
 
 * Added a `spec_pointrange` function for forest-plot like figures. 

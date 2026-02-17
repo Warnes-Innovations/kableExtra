@@ -53,8 +53,11 @@ need to be underlined}
 need to be struck out.}
 
 \item{align}{A character string for cell alignment. For HTML, possible values could
-be \code{l}, \code{c}, \code{r} plus \code{left}, \code{center}, \code{right}, \code{justify}, \code{initial} and \code{inherit}
-while for LaTeX, you can only choose from \code{l}, \code{c} & \code{r}.}
+be \code{l}, \code{c}, \code{r} plus \code{left}, \code{center}, \code{right}, \code{justify}, \code{initial} and \code{inherit}.  All
+legal values should be accepted for LaTeX, e.g.
+\code{l}, \code{c}, \code{r}, \verb{p\{2cm\}}, but the more exotic ones
+may cause problems.  If so, please post a bug
+report!}
 
 \item{color}{A character string/vector for text color. Here please pay
 attention to the differences in color codes between HTML and LaTeX.}
@@ -73,7 +76,7 @@ options including \code{xx-small}, \code{x-small}, \code{small}, \code{medium}, 
 \item{escape}{A T/F value showing whether special characters should be
 escaped.}
 
-\item{line}{A T/F value to control whether a line will appear underneath the
+\item{line}{A T/F value/vector to control whether a line will appear underneath the
 header}
 
 \item{line_sep}{A numeric value indicating how much the midlines should be
@@ -96,7 +99,7 @@ function and adds an header row on top of it.
 }
 \examples{
 \dontrun{
-x <- knitr::kable(head(mtcars), "html")
+x <- kbl(head(mtcars), "html")
 # Add a row of header with 3 columns on the top of the table. The column
 # span for the 2nd and 3rd one are 5 & 6.
 add_header_above(x, c(" ", "Group 1" = 5, "Group 2" = 6))

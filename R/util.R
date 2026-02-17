@@ -38,7 +38,7 @@ usepackage_latex <- function(name, options = NULL) {
 #' is loaded before `knitr` runs, and then these packages
 #' can end up being missed, leading to LaTeX errors such as
 #' "Undefined control sequence."  (See
-#' Github issue #721 for an example.)
+#' GitHub issue #721 for an example.)
 #'
 #' Our `kbl()` wrapper for `knitr::kable()` calls
 #' this function for LaTeX output, so an explicit call
@@ -105,18 +105,18 @@ regex_escape <- function(x, double_backslash = FALSE) {
   x <- gsub("\\?", "\\\\?", x)
   x <- gsub("\\|", "\\\\|", x)
   x <- gsub("\\^", "\\\\^", x)
+  x <- gsub("\\.", "\\\\.", x)
   return(x)
 }
 
-as_kable_xml <- function(x, pre = NULL, post = NULL) {
-  out <- structure(paste(c(pre, as.character(x), post), collapse = "\n"),
-                   format = "html", class = "knitr_kable")
-  return(out)
+regex_unescape <- function(x) {
+  sapply(x, function(y) sub(".", y, "."))
 }
 
-is_html_table <- function(x) {
-  xml_length(x) == 1 &&
-    xml_name(xml_child(x, 1)) == "table"
+as_kable_xml <- function(bodynode) {
+  out <- structure(as.character(bodynode),
+                   format = "html", class = "knitr_kable")
+  return(out)
 }
 
 child_to_character <- function(x) {
@@ -129,24 +129,26 @@ child_to_character <- function(x) {
   result
 }
 
-read_kable_as_xml <- function(x) {
-  kable_html <- read_html(as.character(x), options = c("RECOVER", "NOERROR"))
-  children <- lapply(seq_len(xml_length(kable_html)),
-                     function(num) xml_child(kable_html, num))
-  pre <- character(0)
-  post <- character(0)
-  result <- list()
-  for (i in seq_along(children)) {
-    if (!is_html_table(children[[i]]))
-      pre <- c(pre, child_to_character(children[[i]]))
-    else {
-      result <- xml_child(children[[i]], 1)
-      for (j in seq_along(children)[-seq_len(i)])
-        post <- c(post, child_to_character(children[[i]]))
-      break;
+dfs <- function(node, node_name='table') {
+  if (is.null(node)) return(NULL)
+  if (xml_name(node) == node_name) return(node)
+  for (child in xml_children(node)) {
+    found <- dfs(child, node_name)
+    if (!is.null(found)) {
+      return(found)
     }
   }
-  structure(result, pre = pre, post = post)
+  return(NULL)
+}
+
+read_kable_as_xml <- function(x) {
+  source_node <- read_html(as.character(x), options = c("RECOVER", "NOERROR"))
+  body_node <- xml_children(dfs(source_node, 'body'))
+  table_node <- dfs(source_node, 'table')
+  if (is.null(table_node)) {
+    stop('Did not find a HTML table tag in the provided HTML. ')
+  }
+  return(list(body=body_node, table=table_node))
 }
 
 get_xml_text <- function(xml_node) {
@@ -157,12 +159,25 @@ read_table_data_from_xml <- function(kable_xml) {
   thead <- xml_tpart(kable_xml, "thead")
   tbody <- xml_tpart(kable_xml, "tbody")
 
+  if (is.null(tbody))
+    return(NULL)
+
   # Header part
-  n_header_rows <- xml2::xml_length(thead)
-  col_headers_xml <- xml2::xml_children(xml2::xml_child(thead, n_header_rows))
-  col_headers <- unlist(lapply(col_headers_xml, get_xml_text))
-  n_cols <- length(col_headers)
-  first_column_as_row_names <- (col_headers[1] == '')
+  if (!is.null(thead)) {
+    n_header_rows <- xml2::xml_length(thead)
+    col_headers_xml <- xml2::xml_children(xml2::xml_child(thead, n_header_rows))
+    col_headers <- unlist(lapply(col_headers_xml, get_xml_text))
+    n_cols <- length(col_headers)
+    first_column_as_row_names <- (col_headers[1] == '')
+  } else {
+    first_column_as_row_names <- FALSE
+    col_headers <- NULL
+    # We have no header, so get the maximum number of columns in the body
+    n_cols <- vapply(xml2::xml_children(tbody),
+                     function(row) length(xml2::xml_children(row)),
+                     1L)
+    n_cols <- max(n_cols)
+  }
 
   # Content part
   filtered_rows <- lapply(xml2::xml_children(tbody), function(row) {
@@ -190,13 +205,15 @@ read_table_data_from_xml <- function(kable_xml) {
 }
 
 #' LaTeX Packages
+#' @param xelatex Is `xelatex` going to be used to process
+#' the file?
 #' @description This function shows all LaTeX packages that is supposed to be
 #' loaded for this package in a R Markdown YAML format.
 #'
 #' @export
-kableExtra_latex_packages <- function() {
+kableExtra_latex_packages <- function(xelatex = FALSE) {
 
-  pkg_list <- paste0("  - ", latex_pkg_list())
+  pkg_list <- paste0("  - ", latex_pkg_list(xelatex))
 
   pkg_text <- paste0(
     "header-includes:\n",
@@ -206,7 +223,7 @@ kableExtra_latex_packages <- function() {
   cat(pkg_text)
 }
 
-latex_pkg_list <- function() {
+latex_pkg_list <- function(xelatex = FALSE) {
   return(c(
     "\\usepackage{booktabs}",
     "\\usepackage{longtable}",
@@ -220,7 +237,7 @@ latex_pkg_list <- function() {
     "\\usepackage{threeparttable}",
     "\\usepackage{threeparttablex}",
     "\\usepackage[normalem]{ulem}",
-    "\\usepackage[utf8]{inputenc}",
+    if (!xelatex) "\\usepackage[utf8]{inputenc}",
     "\\usepackage{makecell}",
     "\\usepackage{xcolor}"
   ))
@@ -286,12 +303,23 @@ sim_double_escape <- function(x) {
   return(sub("\\\\", "\\\\\\\\", x))
 }
 
+sim_all_double_escape <- function(x) {
+  return(gsub("\\\\", "\\\\\\\\", x))
+}
+
 # Here (v 1.4.0) we introduced a simple markdown table parser to compensate the
 # breaking change on changing the default of auto_format.
 line_separator <- function(line, idx_matrix) {
   return(trimws(apply(idx_matrix, 1, function(idx) {
     substr(line, idx[1], idx[2])
   })))
+}
+
+separator_indices <- function(line) {
+  separator_indices <- which(strsplit(line, '')[[1]] == '|')
+  cell_start_indices <- separator_indices[-length(separator_indices)] + 1
+  cell_end_indices <- separator_indices[-1] - 1
+  matrix(c(cell_start_indices, cell_end_indices), ncol=2)
 }
 
 md_table_parser <- function(md_table) {
@@ -314,11 +342,7 @@ md_table_parser <- function(md_table) {
   tbody_lines <- md_table[3:length(md_table)]
 
   # Analyze separator line
-  separator_indices <- which(strsplit(separator_line, '')[[1]] == '|')
-  cell_start_indices <- separator_indices[-length(separator_indices)] + 1
-  cell_end_indices <- separator_indices[-1] - 1
-  cell_indices <- matrix(c(cell_start_indices, cell_end_indices), ncol=2)
-
+  cell_indices <- separator_indices(separator_line)
   alignment_raw <- line_separator(separator_line, cell_indices)
   alignment <- sapply(alignment_raw, function(x) {
     if (grepl("^:-+$", x)) 'l' else if (grepl("^:-+:$", x)) 'c' else 'r'
@@ -328,8 +352,14 @@ md_table_parser <- function(md_table) {
   n_rows <- length(tbody_lines)
 
   # thead and tbody
+  # Each line may have different indices if double-width
+  # characters are used (issue #821)
+  cell_indices <- separator_indices(thead_line)
   header_row <- line_separator(thead_line, cell_indices)
-  body_rows <- sapply(tbody_lines, line_separator, cell_indices)
+  body_rows <- sapply(tbody_lines, function(line) {
+    cell_indices <- separator_indices(line)
+    line_separator(line, cell_indices)
+  })
   table_matrix <- matrix(body_rows, ncol = n_cols, byrow = TRUE)
 
   return(kbl(table_matrix, col.names=header_row, align=alignment,
@@ -344,3 +374,12 @@ md_table_parser <- function(md_table) {
 toprule_regexp <- "(\\\\toprule(\\[[^]]*])?)"
 midrule_regexp <- "(\\\\midrule(\\[[^]]*])?)"
 bottomrule_regexp <- "(\\\\bottomrule(\\[[^]]*])?)"
+
+finalize_latex <- function(out, kable_attrs, table_info) {
+  kable_attrs$format <- "latex"
+  attributes(out) <- kable_attrs
+  if (!inherits(out, "knitr_kable"))
+    class(out) <- "knitr_kable"
+  attr(out, "kable_meta") <- table_info
+  out
+}

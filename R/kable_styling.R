@@ -217,9 +217,10 @@ htmlTable_styling <- function(kable_input,
     kable_input <- extract_latex_from_kable(kable_input)
   }
   kable_attrs <- attributes(kable_input)
-  kable_xml <- read_kable_as_xml(kable_input)
-  pre <- attr(kable_xml, "pre")
-  post <- attr(kable_xml, "post")
+  important_nodes <- read_kable_as_xml(kable_input)
+  body_node <- important_nodes$body
+  kable_xml <- important_nodes$table
+
   # Modify class
   bootstrap_options <- match.arg(
     bootstrap_options,
@@ -309,7 +310,7 @@ htmlTable_styling <- function(kable_input,
     }
   }
 
-  out <- as_kable_xml(kable_xml, pre, post)
+  out <- as_kable_xml(body_node)
   if (protect_latex) {
     out <- replace_latex_in_kable(out, kable_attrs$extracted_latex)
     kable_attrs$extracted_latex <- NULL
@@ -334,7 +335,7 @@ pdfTable_styling <- function(kable_input,
                              latex_table_env,
                              table.envir,
                              wraptable_width) {
-
+  kable_attrs <- attributes(kable_input)
   latex_options <- match.arg(
     latex_options,
     c("basic", "striped", "hold_position", "HOLD_position", "scale_down", "scale_up", "repeat_header"),
@@ -399,8 +400,7 @@ pdfTable_styling <- function(kable_input,
   out <- styling_latex_position(out, table_info, position, latex_options,
                                 table.envir, wraptable_width)
 
-  out <- structure(out, format = "latex", class = "knitr_kable")
-  attr(out, "kable_meta") <- table_info
+  out <- finalize_latex(out, kable_attrs, table_info)
 
   if (row_label_position != "l") {
     if (table_info$tabular == "longtable") {

@@ -94,7 +94,9 @@ row_spec_html <- function(kable_input, row, bold, italic, monospace,
                           color, background, align, font_size, angle,
                           extra_css) {
   kable_attrs <- attributes(kable_input)
-  kable_xml <- read_kable_as_xml(kable_input)
+  important_nodes <- read_kable_as_xml(kable_input)
+  body_node <- important_nodes$body
+  kable_xml <- important_nodes$table
 
   table_info <- magic_mirror(kable_input)
   ncol <-  table_info$ncol
@@ -131,6 +133,9 @@ row_spec_html <- function(kable_input, row, bold, italic, monospace,
 
   if (0 %in% row) {
     kable_thead <- xml_tpart(kable_xml, "thead")
+    if (is.null(kable_thead))
+        warning("No row 0 found.")
+    
     original_header_row <- xml_child(kable_thead, length(xml_children(kable_thead)))
     for (theader_i in 1:length(xml_children(original_header_row))) {
       target_header_cell <- xml_child(original_header_row, theader_i)
@@ -154,6 +159,14 @@ row_spec_html <- function(kable_input, row, bold, italic, monospace,
 
   if (length(row) != 0) {
     kable_tbody <- xml_tpart(kable_xml, "tbody")
+    if (is.null(kable_tbody))
+      warning("No table body found")
+    else {
+      group_header_rows <- attr(kable_input, "group_header_rows")
+      if (!is.null(group_header_rows)) {
+        row <- positions_corrector(row, group_header_rows,
+                                   length(xml_children(kable_tbody)))
+      }
 
     group_header_rows <- attr(kable_input, "group_header_rows")
     if (!is.null(group_header_rows)) {
@@ -183,7 +196,7 @@ row_spec_html <- function(kable_input, row, bold, italic, monospace,
     }
   }
 
-  out <- as_kable_xml(kable_xml)
+  out <- as_kable_xml(body_node)
   attributes(out) <- kable_attrs
   if (!"kableExtra" %in% class(out)) class(out) <- c("kableExtra", class(out))
   return(out)
@@ -252,6 +265,7 @@ row_spec_latex <- function(kable_input, row, bold, italic, monospace,
                            underline, strikeout,
                            color, background, align, font_size, angle,
                            hline_after, extra_latex_after) {
+  kable_attrs <- attributes(kable_input)
   table_info <- magic_mirror(kable_input)
   out <- solve_enc(kable_input)
 
@@ -269,9 +283,9 @@ row_spec_latex <- function(kable_input, row, bold, italic, monospace,
                                      underline, strikeout,
                                      color, background, align, font_size, angle,
                                      hline_after, extra_latex_after)
-    temp_sub <- ifelse(i == 1 & (table_info$tabular == "longtable" |
-                                   !is.null(table_info$repeat_header_latex)),
-                       gsub, sub)
+    temp_sub <- if (i == 1 && (table_info$tabular == "longtable" ||
+                                   !is.null(table_info$repeat_header_latex)))
+                  gsub else sub
     if (length(new_row) == 1) {
       # fixed=TRUE is safer but does not always work
       regex <- paste0("\\Q", target_row, "\\E")
@@ -284,7 +298,7 @@ row_spec_latex <- function(kable_input, row, bold, italic, monospace,
       table_info$contents[i] <- new_row
     } else {
       # fixed=TRUE is safer but does not always work
-      regex <- paste0("\\Q", target_row, "\\E")
+      regex <- paste0("\\Q", target_row, "\\E(\\\\\\\\)?")
       if (any(grepl(regex, out))) {
         out <- temp_sub(regex,
           paste(new_row, collapse = ""), out, perl = TRUE)
@@ -296,8 +310,8 @@ row_spec_latex <- function(kable_input, row, bold, italic, monospace,
     }
   }
 
-  out <- structure(out, format = "latex", class = "knitr_kable")
-  attr(out, "kable_meta") <- table_info
+  out <- finalize_latex(out, kable_attrs, table_info)
+
   return(out)
 }
 

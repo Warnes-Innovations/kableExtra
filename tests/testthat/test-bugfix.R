@@ -1,3 +1,48 @@
+test_that("Issue #887: multiple escapes", {
+  expect_snapshot(
+    kbl(x = head(mtcars), format = "latex") %>%
+      pack_rows(group_label = "Group $\\Delta = \\text{A}^1$",
+                start_row = 2, end_row = 5, escape = FALSE)
+  )
+})
+
+test_that("Issue #876: complex alignment", {
+  expect_snapshot(
+    kbl(x = mtcars[1:2,1:2],
+        format = "latex",
+        align = rep("p{2cm}",2)) %>%
+      kable_styling(latex_options = "scale_down")
+  )
+})
+
+
+test_that("Issue #861:  pack_rows with tabularx", {
+  expect_snapshot(
+    kbl(mtcars, format="latex", tabular = "tabularx",
+        valign="{\\textwidth}") %>%
+      kableExtra::pack_rows("XXX", 1,2)
+
+  )
+}
+)
+
+test_that("Issue #836:  latex allowed in add_header_above", {
+  expect_snapshot(
+    kbl(mtcars[1:2, 1:2], col.names=NULL,
+             format = "latex") |>
+    add_header_above("\\textbf{HEADER}", escape = FALSE)
+  )
+}
+)
+
+test_that("Issue #812:  table without header works in collapse_rows", {
+  tab <- kbl(mtcars[1:3, 1:4], col.names = NULL,
+             format = "html", booktabs = TRUE) |>
+    kable_styling(full_width=TRUE) |>
+    collapse_rows(columns=2:3)
+  expect_s3_class(tab, "knitr_kable")
+})
+
 test_that("Issue #806: custom rule widths", {
   expect_snapshot(
     kbl(mtcars[1:3, 1:4],
